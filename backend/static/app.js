@@ -405,6 +405,7 @@ async function loadDashboard() {
     $('kpis').innerHTML = kpi(d.tests_today, 'Tests today') + kpi(d.tests_total, 'Tests saved') + kpi(d.patients, 'Patients') +
       kpi(d.valid_rate == null ? '–' : d.valid_rate + '%', 'Valid first time') + kpi(d.lab_agreement == null ? '–' : d.lab_agreement + '%', `Agreement with lab (${d.lab_checked})`) +
       kpi(d.readers.length, 'Readers online');
+    api('GET', '/api/health').then(h => { $('dbInfo').textContent = 'Database: ' + h.database; }).catch(() => {});
     const days = d.per_day, max = Math.max(1, ...days.map(x => x.tests)), W = 640, H = 220, bw = (W - 40) / days.length;
     $('dayChart').innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Tests per day">` + days.map((x, i) => {
       const h = x.tests / max * (H - 50), xx = 30 + i * bw;

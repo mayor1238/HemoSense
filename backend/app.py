@@ -645,7 +645,8 @@ async def export_all(request: Request):
 
 
 async def health(request: Request):
-    return JSONResponse({"ok": True, "time": now(), "readers_online": len(READERS), "database": "postgres" if store.is_pg else "sqlite"})
+    db = "SQLite (laptop)" if not store.is_pg else "PostgreSQL (server container)" if "@db:" in store.url else "Nobus Managed Database (PostgreSQL)"
+    return JSONResponse({"ok": True, "time": now(), "readers_online": len(READERS), "database": db})
 
 
 async def index(request: Request):

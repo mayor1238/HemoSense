@@ -30,6 +30,17 @@ uvicorn app:app --reload        # http://localhost:8000  (admin / hemosense-admi
 python -m pytest -q             # end-to-end test (pip install pytest)
 ```
 
+## Use Nobus Managed Database
+
+Create a PostgreSQL database in Nobus (Managed Services → Managed Database), allow the server's IP, then add one line to `.env` on the server and restart:
+
+```bash
+echo 'DATABASE_URL=postgresql://USER:PASSWORD@DB-HOST:5432/DBNAME' >> .env
+sudo docker compose up -d
+```
+
+The tables are created automatically. The dashboard shows which database is in use.
+
 ## Test without the reader
 
 On the server, start a pretend reader (results are labelled *Simulated*):

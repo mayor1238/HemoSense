@@ -17,7 +17,8 @@ services:
     build: {context: ., dockerfile: backend/Dockerfile}
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://hemosense:${DB_PASSWORD}@db:5432/hemosense
+      # Set DATABASE_URL in .env to use Nobus Managed Database; otherwise the local db container is used.
+      DATABASE_URL: ${DATABASE_URL:-postgresql://hemosense:${DB_PASSWORD}@db:5432/hemosense}
       DEVICE_KEY: ${DEVICE_KEY:?set DEVICE_KEY in .env}
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:?set ADMIN_PASSWORD in .env}
