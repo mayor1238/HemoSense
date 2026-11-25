@@ -1,25 +1,223 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>HemoSense</title>
-<style>
-body{margin:0;font-family:system-ui,Segoe UI,Arial,sans-serif;background:#f4f6fb;color:#0f172a;display:grid;place-items:center;min-height:100vh}
-.card{background:#fff;border-radius:16px;padding:40px 48px;box-shadow:0 10px 30px rgba(15,23,42,.08);max-width:520px}
-h1{margin:0 0 8px;color:#1d4ed8}p{color:#475569;line-height:1.6}.ok{color:#047857;font-weight:600}
-</style>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 3C16 3 6 15 6 21a10 10 0 0 0 20 0C26 15 16 3 16 3z' fill='%23dc2626'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/static/app.css">
 </head>
-<body>
-<div class="card">
-  <h1>HemoSense</h1>
-  <p>Bedside ABO/Rh blood grouping, running on Nobus Cloud.</p>
-  <p id="status">Checking the server…</p>
+<body data-auth="out">
+
+<!-- ============ LOGIN ============ -->
+<section id="login" class="login">
+  <div class="login-brand">
+    <div class="logo big"><span class="drop"></span>HemoSense</div>
+    <h1>Blood group results at the bedside, in about 2 minutes.</h1>
+    <p>Identify the patient, insert a single-use cartridge, and watch the three wells react live. Every result is stored securely on Nobus Cloud.</p>
+    <ul class="ticks"><li>Two-identifier patient check</li><li>Live impedance curves from the reader</li><li>Anonymous research data, ready to export</li></ul>
+  </div>
+  <form class="login-card" id="loginForm" autocomplete="on">
+    <h2>Sign in</h2>
+    <p class="muted">Use the account your administrator gave you.</p>
+    <label for="lUser">Username</label><input id="lUser" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+    <label for="lPass">Password</label><input id="lPass" type="password" autocomplete="current-password" required>
+    <div class="err" id="lErr"></div>
+    <button class="btn primary wide" id="lGo" type="submit">Sign in</button>
+  </form>
+</section>
+
+<!-- ============ APP SHELL ============ -->
+<div id="shell" class="shell">
+  <aside class="side">
+    <div class="logo"><span class="drop"></span>HemoSense</div>
+    <nav id="nav">
+      <a href="#test" data-page="test"><i>＋</i>New test</a>
+      <a href="#records" data-page="records"><i>☰</i>Clinical records</a>
+      <a href="#research" data-page="research"><i>◎</i>Research data</a>
+      <a href="#dashboard" data-page="dashboard"><i>▦</i>Dashboard</a>
+      <a href="#settings" data-page="settings"><i>⚙</i>Settings</a>
+    </nav>
+    <div class="side-foot">
+      <div class="conn" id="conn"><span class="dot"></span><span>Connecting…</span></div>
+      <div class="who"><b id="whoName">–</b><span id="whoRole">–</span></div>
+      <button class="btn ghost small" id="logout">Sign out</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <!-- ---------- NEW TEST ---------- -->
+    <section class="page" data-page="test">
+      <header class="head">
+        <div><h1>New test</h1><p class="muted" id="facility">–</p></div>
+        <ol class="steps" id="steps"><li>Patient</li><li>Cartridge</li><li>Run</li><li>Result</li></ol>
+      </header>
+      <div class="cols">
+        <div class="col-left">
+          <!-- step 1 -->
+          <div class="card step" id="st1">
+            <h2>Identify the patient</h2>
+            <div class="grid2">
+              <div><label for="pType">ID type</label>
+                <select id="pType"><option value="hospital">Hospital number</option><option value="nhia">NHIA number</option><option value="nin">NIN</option><option value="nbsa">NBSA donor ID</option><option value="emergency">Emergency ID</option></select></div>
+              <div><label for="pId">Patient ID</label><input id="pId" placeholder="Scan wristband or type"></div>
+            </div>
+            <div id="pFound"></div>
+            <div class="grid2">
+              <div><label for="pName">Full name</label><input id="pName"></div>
+              <div><label for="pDob">Date of birth</label><input id="pDob" type="date"></div>
+            </div>
+            <div class="grid2">
+              <div><label for="pSex">Sex</label><select id="pSex"><option value="">Not recorded</option><option>Female</option><option>Male</option></select></div>
+              <div></div>
+            </div>
+            <div class="checks">
+              <label class="check"><input type="checkbox" id="c2id"> I checked two identifiers (name and date of birth) against the wristband</label>
+              <label class="check"><input type="checkbox" id="cCare"> The patient consented to this test for their care</label>
+              <label class="check"><input type="checkbox" id="cRes"> The patient agreed to share an anonymous copy for research</label>
+            </div>
+            <div class="err" id="e1"></div>
+            <div class="actions"><button class="btn primary" id="n1">Continue</button><button class="btn" id="sample1">Sample patient</button><button class="btn ghost" id="emg">Emergency ID</button></div>
+          </div>
+          <!-- step 2 -->
+          <div class="card step" id="st2" hidden>
+            <h2>Cartridge and reagents</h2>
+            <div class="patient-strip" id="strip2"></div>
+            <div class="grid2">
+              <div><label for="cId">Cartridge ID</label><input id="cId" placeholder="Scan the cartridge"></div>
+              <div><label for="cLot">Reagent lot</label><input id="cLot"></div>
+            </div>
+            <div class="grid2">
+              <div><label for="cOp">Operator</label><input id="cOp"></div>
+              <div class="grid2 tight">
+                <div><label for="cSweep">Sweep</label><select id="cSweep"><option value="60">60 s</option><option value="120" selected>120 s</option><option value="180">180 s</option></select></div>
+                <div><label for="cInt">Interval</label><select id="cInt"><option value="1">1 s</option><option value="2" selected>2 s</option><option value="5">5 s</option></select></div>
+              </div>
+            </div>
+            <div class="err" id="e2"></div>
+            <div class="actions"><button class="btn primary" id="n2">Continue</button><button class="btn" id="sample2">Sample values</button><button class="btn ghost" id="b2">Back</button></div>
+          </div>
+          <!-- step 3 -->
+          <div class="card step" id="st3" hidden>
+            <h2>Run the test</h2>
+            <div class="patient-strip" id="strip3"></div>
+            <label for="rSel">Reader</label>
+            <select id="rSel"></select>
+            <div class="reader-info" id="rInfo"></div>
+            <ol class="howto"><li>Calibrate with the 5 kΩ resistor on C0.</li><li>Load the sample into the three wells.</li><li>Start the sweep and keep the cartridge still.</li></ol>
+            <div class="err" id="e3"></div>
+            <div class="actions"><button class="btn primary" id="go">Start sweep</button><button class="btn" id="cal">Calibrate reader</button><button class="btn" id="stop" disabled>Stop and analyse</button><button class="btn ghost" id="b3">Back</button></div>
+          </div>
+          <!-- step 4 -->
+          <div class="card step" id="st4" hidden>
+            <div id="result"></div>
+            <label class="check strong"><input type="checkbox" id="cfm"> I checked this result against the patient's wristband</label>
+            <div class="err" id="e4"></div>
+            <div class="actions"><button class="btn primary" id="save">Save to patient record</button><button class="btn" id="retest">Retest with a new cartridge</button><button class="btn ghost" id="next" hidden>Next patient</button></div>
+          </div>
+        </div>
+
+        <div class="col-right">
+          <div class="card live">
+            <div class="live-head">
+              <div><h2>Live reader</h2><p class="muted" id="liveSub">No test running</p></div>
+              <div class="code" id="liveCode" hidden></div>
+            </div>
+            <div class="wells" id="wells"></div>
+            <div class="progress"><div id="prog"></div></div>
+            <div class="chart" id="liveChart"></div>
+            <div class="legend"><span><i class="la"></i>Anti-A</span><span><i class="lb"></i>Anti-B</span><span><i class="ld"></i>Anti-D</span><span><i class="lt"></i>Threshold</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------- RECORDS ---------- -->
+    <section class="page" data-page="records" hidden>
+      <header class="head"><div><h1>Clinical records</h1><p class="muted">Every saved test, stored in the HemoSense database on Nobus Cloud.</p></div></header>
+      <div class="card">
+        <div class="filters">
+          <input id="fQ" placeholder="Search name, patient ID or cartridge">
+          <select id="fG"><option value="">All groups</option></select>
+          <select id="fL"><option value="">All results</option><option value="confirmed">Lab confirmed</option><option value="pending">Awaiting lab</option></select>
+        </div>
+        <div class="msg" id="recMsg"></div>
+        <div class="table-wrap"><table class="table" id="recTable"></table></div>
+      </div>
+    </section>
+
+    <!-- ---------- RESEARCH ---------- -->
+    <section class="page" data-page="research" hidden>
+      <header class="head"><div><h1>Research data</h1><p class="muted">Anonymous copies of consented tests: no name, no ID, no date of birth.</p></div>
+        <button class="btn primary" id="csv">Download CSV</button></header>
+      <div class="kpis" id="resKpis"></div>
+      <div class="card"><div class="table-wrap"><table class="table" id="resTable"></table></div></div>
+    </section>
+
+    <!-- ---------- DASHBOARD ---------- -->
+    <section class="page" data-page="dashboard" hidden>
+      <header class="head"><div><h1>Dashboard</h1><p class="muted">Activity across all readers.</p></div></header>
+      <div class="kpis" id="kpis"></div>
+      <div class="grid-2">
+        <div class="card"><h2>Tests per day</h2><div class="chart" id="dayChart"></div></div>
+        <div class="card"><h2>Blood group mix</h2><div id="groupBars"></div></div>
+      </div>
+      <div class="card"><h2>Readers</h2><div id="readerList"></div></div>
+    </section>
+
+    <!-- ---------- SETTINGS ---------- -->
+    <section class="page" data-page="settings" hidden>
+      <header class="head"><div><h1>Settings</h1><p class="muted">Shared by every computer. Only an admin can change them.</p></div></header>
+      <div class="grid-2">
+        <div class="card">
+          <h2>Analysis</h2>
+          <label for="sFac">Facility</label><input id="sFac">
+          <div class="grid2">
+            <div><label for="sMethod">How to decide agglutination</label><select id="sMethod"><option value="relative">Change over time (%)</option><option value="range">Impedance ranges (kΩ)</option></select></div>
+            <div><label for="sDir">Agglutination makes the reading</label><select id="sDir"><option value="rise">Rise</option><option value="fall">Fall</option></select></div>
+          </div>
+          <div class="grid2">
+            <div><label for="sThr">Positive threshold (%)</label><input id="sThr" type="number" step="0.5"></div>
+            <div><label for="sSet">Settling readings skipped</label><input id="sSet" type="number" step="1"></div>
+          </div>
+          <div class="grid2">
+            <div><label for="sSweep">Default sweep (s)</label><input id="sSweep" type="number"></div>
+            <div><label for="sInt">Default interval (s)</label><input id="sInt" type="number"></div>
+          </div>
+          <div id="rangeBox">
+            <div class="grid2">
+              <div><label>Agglutinated range (kΩ)</label><div class="pair"><input id="sAggLo" type="number" step="0.5"><span>to</span><input id="sAggHi" type="number" step="0.5"></div></div>
+              <div><label>Not agglutinated (kΩ)</label><div class="pair"><input id="sNonLo" type="number" step="0.5"><span>to</span><input id="sNonHi" type="number" step="0.5"></div></div>
+            </div>
+          </div>
+          <div class="msg" id="sMsg"></div>
+          <div class="actions"><button class="btn primary" id="sSave">Save settings</button><button class="btn" id="sCopper">Copper board preset</button></div>
+        </div>
+        <div>
+          <div class="card admin-only">
+            <h2>Users</h2>
+            <div class="table-wrap"><table class="table" id="uTable"></table></div>
+            <div class="grid2"><div><label for="uName">Username</label><input id="uName" autocapitalize="none"></div><div><label for="uFull">Full name</label><input id="uFull"></div></div>
+            <div class="grid2"><div><label for="uPass">Password (8+ characters)</label><input id="uPass" type="password" autocomplete="new-password"></div>
+              <div><label for="uRole">Role</label><select id="uRole"><option value="operator">Operator</option><option value="admin">Admin</option></select></div></div>
+            <div class="msg" id="uMsg"></div>
+            <div class="actions"><button class="btn" id="uAdd">Add user</button></div>
+          </div>
+          <div class="card admin-only">
+            <h2>Data</h2>
+            <p class="muted">Download every saved test with its readings as one JSON file.</p>
+            <div class="actions"><button class="btn" id="exportAll">Download all data (JSON)</button></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
 </div>
-<script>
-fetch('/api/health').then(r => r.json()).then(d => {
-  document.getElementById('status').innerHTML =
-    `<span class="ok">Server online</span> · database: ${d.database} · readers online: ${d.readers_online}`;
-}).catch(() => { document.getElementById('status').textContent = 'Server not reachable.'; });
-</script>
+
+<!-- ============ PATIENT DRAWER ============ -->
+<div class="drawer-bg" id="drawerBg" hidden></div>
+<aside class="drawer" id="drawer" hidden></aside>
+
+<script src="/static/app.js"></script>
 </body>
 </html>
