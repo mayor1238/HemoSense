@@ -175,6 +175,8 @@ Offline tests can be moved to Nobus later: export them as JSON on the laptop, th
 ## Team
 
 - **Mayowa Titilola** (GitHub [mayor1238](https://github.com/mayor1238))
+- **Oriaku David**
+- **Odiwe Emeka**
 
 ## References
 
