@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HemoSense</title>
+<style>
+body{margin:0;font-family:system-ui,Segoe UI,Arial,sans-serif;background:#f4f6fb;color:#0f172a;display:grid;place-items:center;min-height:100vh}
+.card{background:#fff;border-radius:16px;padding:40px 48px;box-shadow:0 10px 30px rgba(15,23,42,.08);max-width:520px}
+h1{margin:0 0 8px;color:#1d4ed8}p{color:#475569;line-height:1.6}.ok{color:#047857;font-weight:600}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>HemoSense</h1>
+  <p>Bedside ABO/Rh blood grouping, running on Nobus Cloud.</p>
+  <p id="status">Checking the server…</p>
+</div>
+<script>
+fetch('/api/health').then(r => r.json()).then(d => {
+  document.getElementById('status').innerHTML =
+    `<span class="ok">Server online</span> · database: ${d.database} · readers online: ${d.readers_online}`;
+}).catch(() => { document.getElementById('status').textContent = 'Server not reachable.'; });
+</script>
+</body>
+</html>

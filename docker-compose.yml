@@ -1,0 +1,42 @@
+# HemoSense on one Nobus server: PostgreSQL + the app + Caddy (HTTPS).
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: hemosense
+      POSTGRES_USER: hemosense
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+    volumes: [dbdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hemosense -d hemosense"]
+      interval: 5s
+      retries: 12
+
+  app:
+    build: {context: ., dockerfile: backend/Dockerfile}
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://hemosense:${DB_PASSWORD}@db:5432/hemosense
+      DEVICE_KEY: ${DEVICE_KEY:?set DEVICE_KEY in .env}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?set ADMIN_PASSWORD in .env}
+    depends_on:
+      db: {condition: service_healthy}
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443", "8080:8080"]
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddydata:/data
+      - caddyconfig:/config
+    depends_on: [app]
+
+volumes:
+  dbdata:
+  caddydata:
+  caddyconfig:

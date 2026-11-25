@@ -1,0 +1,15 @@
+# HTTPS for the app. Caddy gets the certificate by itself.
+{$DOMAIN} {
+	encode gzip
+	reverse_proxy app:8000
+}
+
+# Backup entrance for readers only (plain WebSocket on port 8080).
+:8080 {
+	handle /ws/reader {
+		reverse_proxy app:8000
+	}
+	handle {
+		respond 404
+	}
+}
