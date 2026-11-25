@@ -30,6 +30,23 @@ uvicorn app:app --reload        # http://localhost:8000  (admin / hemosense-admi
 python -m pytest -q             # end-to-end test (pip install pytest)
 ```
 
+## Test without the reader
+
+On the server, start a pretend reader (results are labelled *Simulated*):
+
+```bash
+sudo docker compose exec app python tools/virtual_reader.py --server ws://localhost:8000 --key YOUR_DEVICE_KEY --speed 4
+```
+
+## Connect the real reader (no firmware change)
+
+Laptop WiFi on the reader's network `HemoSense-XXXX`, internet from a phone by USB tethering, then:
+
+```bash
+pip install websockets
+python tools/reader_bridge.py --server wss://YOUR-LINK --key YOUR_DEVICE_KEY
+```
+
 ## Layout
 
 | Path | What |
@@ -39,5 +56,7 @@ python -m pytest -q             # end-to-end test (pip install pytest)
 | `backend/db.py` | Tables; SQLite locally, PostgreSQL on Nobus |
 | `backend/static/` | The web app |
 | `deploy/` | Caddy (HTTPS) and the setup script |
+| `tools/virtual_reader.py` | Pretend reader for testing |
+| `tools/reader_bridge.py` | Links the real reader's WiFi to the server |
 
 Prototype for research and demonstration. Confirm every result with standard laboratory grouping.
