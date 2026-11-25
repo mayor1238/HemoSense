@@ -41,6 +41,16 @@ sudo docker compose up -d
 
 The tables are created automatically. The dashboard shows which database is in use.
 
+## Run on Nobus Cube (no server to manage)
+
+Managed Services → Cube → Create: Custom Repository `https://github.com/mayor1238/HemoSense.git`, branch `main`, container port `8000`. Environment variables:
+
+| Name | Value |
+|---|---|
+| `DATABASE_URL` | the Nobus Managed Database connection (without it, data is lost when the container restarts) |
+| `ADMIN_PASSWORD` | your admin password |
+| `DEVICE_KEY` | a secret key for readers |
+
 ## Test without the reader
 
 On the server, start a pretend reader (results are labelled *Simulated*):
