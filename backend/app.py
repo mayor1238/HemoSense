@@ -639,9 +639,74 @@ async def research_csv(request: Request):
 @needs_login(admin=True)
 async def export_all(request: Request):
     rows = store.rows(TEST_LIST_SQL + " ORDER BY t.saved_at")
-    return JSONResponse({"exported_at": now(), "settings": settings(),
-                         "tests": [{**test_view(t), "readings": test_readings(t["id"])} for t in rows]},
+    tests = [{**test_view(t), "readings": test_readings(t["id"]),
+              "extra": {k: t[k] for k in ("firmware", "facility", "sweep_s", "interval_s", "finished_at", "analysis_settings")}}
+             for t in rows]
+    return JSONResponse({"format": "hemosense-export-1", "exported_at": now(), "settings": settings(), "tests": tests},
                         headers={"Content-Disposition": "attachment; filename=hemosense-export.json"})
+
+
+@needs_login(admin=True)
+async def import_all(request: Request):
+    """Adds tests exported from another HemoSense (e.g. a laptop used offline at the bedside)."""
+    data = await read_json(request)
+    tests = data.get("tests")
+    if not isinstance(tests, list):
+        return fail("This is not a HemoSense export file.")
+    added = skipped = 0
+    problems: list[str] = []
+    for t in tests:
+        try:
+            tid = str(uuid.UUID(str(t["id"])))
+            p = t["patient"]
+            if store.row("SELECT id FROM tests WHERE id = :i", i=tid):
+                skipped += 1
+                continue
+            if p.get("id_type") not in ID_TYPES or not p.get("id_value") or not p.get("full_name"):
+                raise ValueError("missing patient details")
+            found = store.row("SELECT * FROM patients WHERE id_type = :t AND LOWER(id_value) = :v",
+                              t=p["id_type"], v=str(p["id_value"]).lower())
+            if found:
+                if found["full_name"].strip().lower() != str(p["full_name"]).strip().lower() or (found["dob"] or "") != (p.get("dob") or ""):
+                    problems.append(f"{t.get('code', tid)}: patient {p['id_value']} has a different name or date of birth here; not imported.")
+                    continue
+                pid = found["id"]
+            else:
+                pid = str(uuid.uuid4())
+                store.run("INSERT INTO patients (id, id_type, id_value, full_name, dob, sex, created_at, created_by) "
+                          "VALUES (:i, :t, :v, :n, :d, :s, :c, :u)", i=pid, t=p["id_type"], v=p["id_value"],
+                          n=p["full_name"], d=p.get("dob"), s=p.get("sex"), c=now(), u=request.state.user["id"])
+            x = t.get("extra") or {}
+            store.run("INSERT INTO tests (id, patient_id, operator, user_id, cartridge_id, reagent_lot, reader_id, firmware, "
+                      "simulated, facility, research_consent, sweep_s, interval_s, status, started_at, finished_at, blood_group, "
+                      "result_valid, confidence, method, notes, analysis_settings, lab_group, saved_at) VALUES (:i, :p, :o, :u, "
+                      ":c, :l, :r, :f, :sim, :fac, :rc, :sw, :iv, :st, :sa, :fa, :g, :v, :conf, :m, :n, :an, :lab, :sv)",
+                      i=tid, p=pid, o=t.get("operator") or "imported", u=request.state.user["id"], c=t["cartridge_id"],
+                      l=t.get("reagent_lot") or "", r=t.get("reader_id") or "", f=x.get("firmware"),
+                      sim=1 if t.get("simulated") else 0, fac=x.get("facility"), rc=1 if t.get("research") else 0,
+                      sw=float(x.get("sweep_s") or 120), iv=float(x.get("interval_s") or 2), st=t.get("status") or "done",
+                      sa=t["started_at"], fa=x.get("finished_at"), g=t.get("group"), v=1 if t.get("valid") else 0,
+                      conf=t.get("confidence"), m=t.get("method"), n=to_json(t.get("notes") or []),
+                      an=x.get("analysis_settings") or to_json(settings()), lab=t.get("lab_group") if t.get("lab_group") in GROUPS else None,
+                      sv=t.get("saved_at") or now())
+            for r in t.get("readings") or []:
+                z, re_, im = (r.get(k) or [None, None, None] for k in ("z", "re", "im"))
+                store.run("INSERT INTO readings (test_id, seq, t_ms, z_a, z_b, z_d, re_a, re_b, re_d, im_a, im_b, im_d) "
+                          "VALUES (:t, :s, :ms, :za, :zb, :zd, :ra, :rb, :rd, :ia, :ib, :id) ON CONFLICT (test_id, seq) DO NOTHING",
+                          t=tid, s=int(r["seq"]), ms=int(r["t_ms"]), za=z[0], zb=z[1], zd=z[2], ra=re_[0], rb=re_[1], rd=re_[2],
+                          ia=im[0], ib=im[1], id=im[2])
+            if t.get("research"):
+                result = analyse(test_readings(tid), from_json(x.get("analysis_settings"), settings()))
+                store.run("INSERT INTO research (test_id, created_at, reader_id, firmware, simulated, reagent_lot, age_band, sex, "
+                          "device_group, lab_group, features) VALUES (:i, :c, :r, :f, :sim, :l, :a, :s, :g, :lab, :ft)",
+                          i=tid, c=t["started_at"], r=t.get("reader_id"), f=x.get("firmware"), sim=1 if t.get("simulated") else 0,
+                          l=t.get("reagent_lot"), a=age_band(p.get("dob")), s=p.get("sex"), g=t.get("group") or "invalid",
+                          lab=t.get("lab_group") if t.get("lab_group") in GROUPS else None, ft=to_json(result))
+            added += 1
+        except (KeyError, TypeError, ValueError) as e:
+            problems.append(f"{t.get('code', '?') if isinstance(t, dict) else '?'}: skipped ({e}).")
+    log.info("Import by %s: %d added, %d already here, %d problems", request.state.user["username"], added, skipped, len(problems))
+    return JSONResponse({"added": added, "already_here": skipped, "problems": problems})
 
 
 async def health(request: Request):
@@ -701,6 +766,7 @@ app = Starlette(
         Route("/api/research", research),
         Route("/api/research.csv", research_csv),
         Route("/api/export.json", export_all),
+        Route("/api/import", import_all, methods=["POST"]),
         WebSocketRoute("/ws/reader", reader_socket),
         WebSocketRoute("/ws/app", app_socket),
         Mount("/static", StaticFiles(directory=STATIC), name="static"),

@@ -205,8 +205,12 @@
           </div>
           <div class="card admin-only">
             <h2>Data</h2>
-            <p class="muted">Download every saved test with its readings as one JSON file.</p>
+            <p class="muted">Download every saved test with its readings as one file. On the Nobus app, import a file from a laptop that tested offline at the bedside: its patients, tests and readings are added, and anything already here is skipped.</p>
             <div class="actions"><button class="btn" id="exportAll">Download all data (JSON)</button></div>
+            <label for="importFile">Import tests from another HemoSense</label>
+            <input type="file" id="importFile" accept=".json,application/json">
+            <div class="msg" id="impMsg"></div>
+            <div class="actions"><button class="btn primary" id="importGo">Import file</button></div>
           </div>
         </div>
       </div>

@@ -455,6 +455,17 @@ $('uAdd').onclick = async () => {
   } catch (e) { $('uMsg').innerHTML = `<div class="note bad">${esc(e.message)}</div>`; }
 };
 $('exportAll').onclick = () => download('/api/export.json', 'hemosense-export.json').catch(e => alert(e.message));
+$('importGo').onclick = async () => {
+  const f = $('importFile').files[0];
+  if (!f) return void ($('impMsg').innerHTML = '<div class="note warn">Choose the hemosense-export.json file first.</div>');
+  $('importGo').disabled = true; $('impMsg').innerHTML = '<div class="note info">Importing…</div>';
+  try {
+    const d = await api('POST', '/api/import', JSON.parse(await f.text()));
+    $('impMsg').innerHTML = `<div class="note ok"><b>${d.added} test${d.added === 1 ? '' : 's'} added</b>, ${d.already_here} already here.</div>` +
+      (d.problems.length ? `<div class="note warn">${d.problems.map(esc).join('<br>')}</div>` : '');
+  } catch (e) { $('impMsg').innerHTML = `<div class="note bad">${esc(e.message === 'Unexpected token' ? 'That file is not valid JSON.' : e.message)}</div>`; }
+  finally { $('importGo').disabled = false; }
+};
 
 /* ------------------------------------------------ start */
 resetTest(); connState();

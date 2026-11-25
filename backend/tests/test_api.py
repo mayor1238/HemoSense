@@ -155,6 +155,21 @@ async def flow():
         assert r.count("\n") == 17
         st, r = await call("GET", "/api/export.json", None, tok)
         assert st == 200 and len(r["tests"][0]["readings"]) == 16
+        exported = r
+        st, r = await call("POST", "/api/import", exported, tok)
+        assert st == 200 and r["added"] == 0 and r["already_here"] == 1, r
+        moved = json.loads(json.dumps(exported))
+        moved["tests"][0]["id"] = str(uuid.uuid4())
+        moved["tests"][0]["cartridge_id"] = "CT-LAPTOP"
+        moved["tests"][0]["patient"]["id_value"] = "LAPTOP-9"
+        st, r = await call("POST", "/api/import", moved, tok)
+        assert st == 200 and r["added"] == 1 and not r["problems"], r
+        st, r = await call("GET", "/api/patients/find?id_type=hospital&id_value=LAPTOP-9", None, tok)
+        assert r["patient"]["last"]["group"] == "A+"
+        st, r = await call("GET", f"/api/tests/{moved['tests'][0]['id']}", None, tok)
+        assert len(r["readings"]) == 16 and r["analysis"]["group"] == "A+"
+        st, r = await call("GET", "/api/research", None, tok)
+        assert len(r["research"]) == 2
 
         # reader restarts mid-test -> interrupted
         t2 = str(uuid.uuid4())
